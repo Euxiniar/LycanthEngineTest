@@ -65,3 +65,11 @@ if (NOT UNIX)
 else()
 	add_definitions(-std=c++14)
 endif()
+
+#cmake_minimum_required(VERSION 2.8)
+
+#project (LycanthEngine)
+#set(CMAKE_BUILD_TYPE Release)
+
+#include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+#add_library(LycanthEngine STATIC src/main.cpp)
