@@ -100,10 +100,39 @@ int main()
 	device_info.ppEnabledLayerNames = NULL;
 	device_info.pEnabledFeatures = NULL;
 
-	VkDevice device;
+	VkDevice device = {};
 	res = vkCreateDevice(gpus[0], &device_info, NULL, &device);
 	assert(res == VK_SUCCESS);
 
+	/* Create a command pool to allocate our command buffer from */
+	VkCommandPoolCreateInfo cmd_pool_info = {};
+	cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	cmd_pool_info.pNext = NULL;
+	cmd_pool_info.flags = 0;
+
+	VkCommandPool cmd_pool = {};
+	res = vkCreateCommandPool(device, &cmd_pool_info, NULL, &cmd_pool);
+	assert(res == VK_SUCCESS);
+
+	/* Create the command buffer from the command pool */
+	VkCommandBufferAllocateInfo cmd_info = {};
+	cmd_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	cmd_info.pNext = NULL;
+	cmd_info.commandPool = cmd_pool;
+	cmd_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	cmd_info.commandBufferCount = 1;
+
+
+	VkCommandBuffer cmd = {};
+	res = vkAllocateCommandBuffers(device, &cmd_info, &cmd);
+	assert(res == VK_SUCCESS);
+
+
+	VkCommandBuffer cmd_bufs[1] = { cmd };
+
+
+	vkFreeCommandBuffers(device, cmd_pool, 1, cmd_bufs);
+	vkDestroyCommandPool(device, cmd_pool, NULL);
 	vkDestroyDevice(device, NULL);
 	vkDestroyInstance(inst, NULL);
 
