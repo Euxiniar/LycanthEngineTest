@@ -1,6 +1,8 @@
 #include <vulkan\vulkan.h>
 #include <iostream>
+#include <cassert>
 #include <conio.h>
+#include <vector>
 
 #define APP_NAME "LycanthEngine"
 #define ENGINE_NAME "LycanthEngine";
@@ -43,7 +45,17 @@ int main()
 		exit(-1);
 	}
 
+	uint32_t gpu_count = 1;
+	res = vkEnumeratePhysicalDevices(inst, &gpu_count, NULL);
+	assert(gpu_count);
+	
+	std::vector<VkPhysicalDevice> gpus;
+	gpus.resize(gpu_count);
+	res = vkEnumeratePhysicalDevices(inst, &gpu_count, gpus.data());
+	assert(!res && gpu_count >= 1);
+
 	vkDestroyInstance(inst, NULL);
+
 	_getch();
 	return 0;
 }
