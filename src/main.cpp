@@ -108,6 +108,7 @@ int main()
 	VkCommandPoolCreateInfo cmd_pool_info = {};
 	cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	cmd_pool_info.pNext = NULL;
+	cmd_pool_info.queueFamilyIndex = queue_info.queueFamilyIndex;
 	cmd_pool_info.flags = 0;
 
 	VkCommandPool cmd_pool = {};
