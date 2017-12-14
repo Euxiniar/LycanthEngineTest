@@ -44,7 +44,7 @@ if(EXISTS ${LIBS_PATH})
 	link_libraries("${LIBS_PATH}/vulkan-1.lib")
 	message("Libs linked")
 else()
-	message("Libs unlinked !")
+	message("Libs not linked !")
 endif()
 
 if(EXISTS ${INCLUDES_PATH})
@@ -55,7 +55,7 @@ else()
 endif()
 
 add_executable(${PROJECT_NAME} ${SRC})
-add_library(LycanthEngine-1 STATIC src/main.cpp)
+add_library(LycanthEngine-1 STATIC src/Engine/Vulkan_Engine.cpp)
 
 if (NOT UNIX)
 	set_target_properties(${PROJECT_NAME} PROPERTIES
