@@ -15,11 +15,22 @@ Vulkan_Engine::Vulkan_Engine(const char* app_name)
 	enumerate_device();
 	init_swapchain_extension();
 	init_device();
+
+	init_command_pool();
+	init_command_buffer();
+
+	execute_begin_command_buffer();
+
+	init_device_queue();
+
+
 }
 
 
 Vulkan_Engine::~Vulkan_Engine()
 {
+	destroy_command_buffer();
+	destroy_command_pool();
 	destroy_device();
 	destroy_window();
 	destroy_instance();
@@ -180,8 +191,11 @@ void Vulkan_Engine::init_window(const char* app_name)
 	// Register window class:
 	if (!RegisterClassEx(&win_class)) {
 		// It didn't work, so try to give a useful error:
+#if defined(_WIN32)
+		MessageBox(m_window, "Unexpected error trying to start the application!", "Error", MB_ICONERROR | IDCANCEL);
+#else
 		std::cout << "Unexpected error trying to start the application!" << std::endl;
-		fflush(stdout);
+#endif
 		exit(1);
 	}
 	// Create window with the registered class:
@@ -201,8 +215,11 @@ void Vulkan_Engine::init_window(const char* app_name)
 		NULL);               // no extra parameters
 	if (!m_window) {
 		// It didn't work, so try to give a useful error:
-		printf("Cannot create a window in which to draw!\n");
-		fflush(stdout);
+#if defined(_WIN32)
+		MessageBox(m_window, "Cannot create a window in which to draw!", "Error", MB_ICONERROR | IDCANCEL);
+#else
+		std::cout << "Cannot create a window in which to draw!\n";
+#endif
 		exit(1);
 	}
 	SetWindowLongPtr(m_window, GWLP_USERDATA, (LONG_PTR)this);
@@ -231,7 +248,8 @@ void Vulkan_Engine::init_swapchain_extension()
 	assert(res == VK_SUCCESS);
 
 	// Iterate over each queue to learn whether it supports presenting:
-	VkBool32 *pSupportsPresent = (VkBool32 *)malloc(m_queue_family_count * sizeof(VkBool32));
+	std::vector<VkBool32> pSupportsPresent;
+	pSupportsPresent.resize(m_queue_family_count);
 	for (uint32_t i = 0; i < m_queue_family_count; i++) {
 		vkGetPhysicalDeviceSurfaceSupportKHR(m_gpus[0], i, m_surface, &pSupportsPresent[i]);
 	}
@@ -241,10 +259,15 @@ void Vulkan_Engine::init_swapchain_extension()
 	m_graphics_queue_family_index = UINT32_MAX;
 	m_present_queue_family_index = UINT32_MAX;
 	for (uint32_t i = 0; i < m_queue_family_count; ++i) {
-		if ((m_queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
-			if (m_graphics_queue_family_index == UINT32_MAX) m_graphics_queue_family_index = i;
+		if ((m_queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) 
+		{
+			if (m_graphics_queue_family_index == UINT32_MAX)
+			{
+				m_graphics_queue_family_index = i;
+			}
 
-			if (pSupportsPresent[i] == VK_TRUE) {
+			if (pSupportsPresent[i] == VK_TRUE) 
+			{
 				m_graphics_queue_family_index = i;
 				m_present_queue_family_index = i;
 				break;
@@ -261,15 +284,16 @@ void Vulkan_Engine::init_swapchain_extension()
 				break;
 			}
 	}
-	free(pSupportsPresent);
 
 	// Generate error if could not find queues that support graphics
 	// and present
-	if (m_graphics_queue_family_index == UINT32_MAX || m_present_queue_family_index == UINT32_MAX) {
+	if (m_graphics_queue_family_index == UINT32_MAX || m_present_queue_family_index == UINT32_MAX) 
+	{
 #if defined(_WIN32)
-		MessageBox(m_window, "Could not find a queues for both graphics and present", "Error", MB_ICONERROR | IDOK);
+		MessageBox(m_window, "Could not find a queues for both graphics and present", "Error", MB_ICONERROR | IDCANCEL);
+#else
+		std::cout << "Could not find a queues for both graphics and present\n";
 #endif
-		std::cout << "Could not find a queues for both graphics and present";
 		exit(-1);
 	}
 
@@ -281,13 +305,86 @@ void Vulkan_Engine::init_swapchain_extension()
 	res = vkGetPhysicalDeviceSurfaceFormatsKHR(m_gpus[0], m_surface, &formatCount, surfFormats);
 	assert(res == VK_SUCCESS);
 
-	if (formatCount == 1 && surfFormats[0].format == VK_FORMAT_UNDEFINED) {
+	if (formatCount == 1 && surfFormats[0].format == VK_FORMAT_UNDEFINED) 
+	{
 		m_format = VK_FORMAT_B8G8R8A8_UNORM;
 	}
-	else {
+	else 
+	{
 		assert(formatCount >= 1);
 		m_format = surfFormats[0].format;
 	}
 	free(surfFormats);
 }
 
+/*************************************************************Command Pool Part*******************************************************************************************/
+void Vulkan_Engine::init_command_pool()
+{
+	/* DEPENDS on init_swapchain_extension() */
+	VkResult res;
+
+	VkCommandPoolCreateInfo cmd_pool_info = {};
+	cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	cmd_pool_info.pNext = NULL;
+	cmd_pool_info.queueFamilyIndex = m_graphics_queue_family_index;
+	cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+	res = vkCreateCommandPool(m_device, &cmd_pool_info, NULL, &m_cmd_pool);
+	assert(res == VK_SUCCESS);
+}
+
+void Vulkan_Engine::destroy_command_pool()
+{
+	vkDestroyCommandPool(m_device, m_cmd_pool, NULL);
+}
+
+/*************************************************************Command Buffer Part*******************************************************************************************/
+void Vulkan_Engine::init_command_buffer() 
+{
+	/* DEPENDS on init_swapchain_extension() and init_command_pool() */
+	VkResult res;
+
+	VkCommandBufferAllocateInfo cmd = {};
+	cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	cmd.pNext = NULL;
+	cmd.commandPool = m_cmd_pool;
+	cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	cmd.commandBufferCount = 1;
+
+	res = vkAllocateCommandBuffers(m_device, &cmd, &m_cmd);
+	assert(res == VK_SUCCESS);
+}
+
+void Vulkan_Engine::destroy_command_buffer()
+{
+	VkCommandBuffer cmd_bufs[1] = { m_cmd };
+	vkFreeCommandBuffers(m_device, m_cmd_pool, 1, cmd_bufs);
+}
+
+void Vulkan_Engine::execute_begin_command_buffer() 
+{
+	/* DEPENDS on init_command_buffer() */
+	VkResult res;
+
+	VkCommandBufferBeginInfo cmd_buf_info = {};
+	cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	cmd_buf_info.pNext = NULL;
+	cmd_buf_info.flags = 0;
+	cmd_buf_info.pInheritanceInfo = NULL;
+
+	res = vkBeginCommandBuffer(m_cmd, &cmd_buf_info);
+	assert(res == VK_SUCCESS);
+}
+
+void Vulkan_Engine::init_device_queue() {
+	/* DEPENDS on init_swapchain_extension() */
+	vkGetDeviceQueue(m_device, m_graphics_queue_family_index, 0, &m_graphics_queue);
+	if (m_graphics_queue_family_index == m_present_queue_family_index) 
+	{
+		m_present_queue = m_graphics_queue;
+	}
+	else 
+	{
+		vkGetDeviceQueue(m_device, m_present_queue_family_index, 0, &m_present_queue);
+	}
+}

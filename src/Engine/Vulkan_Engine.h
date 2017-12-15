@@ -19,6 +19,7 @@ public:
 
 
 private:
+	/*****************************************Functions***************************************************************/
 	void init_instance_extension_names();
 	VkResult init_instance(char const *const app_short_name);
 	void destroy_instance();
@@ -34,6 +35,19 @@ private:
 
 	void init_swapchain_extension();
 
+	void init_command_pool();
+	void destroy_command_pool();
+
+	void init_command_buffer();
+	void destroy_command_buffer();
+
+	void execute_begin_command_buffer();
+
+	void init_device_queue();
+
+
+
+	/*****************************************Arguments***************************************************************/
 	VkInstance m_inst;
 	VkDevice m_device;
 
@@ -61,4 +75,10 @@ private:
 
 	VkSurfaceKHR m_surface;
 	VkFormat m_format;
+
+	VkCommandPool m_cmd_pool;
+	VkCommandBuffer m_cmd;
+
+	VkQueue m_graphics_queue;
+	VkQueue m_present_queue;
 };

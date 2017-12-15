@@ -54,7 +54,12 @@ else()
 	message("Includes not included !")
 endif()
 
+if(WIN32)
+add_executable(${PROJECT_NAME} WIN32 ${SRC})
+else()
 add_executable(${PROJECT_NAME} ${SRC})
+endif()
+
 add_library(LycanthEngine-1 STATIC src/Engine/Vulkan_Engine.cpp)
 
 if (NOT UNIX)
