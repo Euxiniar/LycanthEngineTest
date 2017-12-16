@@ -9,7 +9,7 @@ typedef struct _swap_chain_buffers
 {
 	VkImage image;
 	VkImageView view;
-} swap_chain_buffer;
+} swapchain_buffer;
 
 class Vulkan_Engine
 {
@@ -44,6 +44,9 @@ private:
 	void execute_begin_command_buffer();
 
 	void init_device_queue();
+
+	void init_swapchain(VkImageUsageFlags usageFlags = 17);
+	void destroy_swapchain();
 
 
 
@@ -81,4 +84,10 @@ private:
 
 	VkQueue m_graphics_queue;
 	VkQueue m_present_queue;
+
+	VkSwapchainKHR m_swapchain;
+	uint32_t m_swapchainImageCount;
+
+	std::vector<swapchain_buffer> m_buffers;
+	uint32_t m_current_buffer;
 };

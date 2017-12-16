@@ -64,10 +64,10 @@ add_library(LycanthEngine-1 STATIC src/Engine/Vulkan_Engine.cpp)
 
 if (NOT UNIX)
 	set_target_properties(${PROJECT_NAME} PROPERTIES
-	    CXX_STANDARD 14
+	    CXX_STANDARD 17
 	    CXX_STANDARD_REQUIRED ON
 	    CXX_EXTENSIONS OFF
 	)
 else()
-	add_definitions(-std=c++14)
+	add_definitions(-std=c++17)
 endif()

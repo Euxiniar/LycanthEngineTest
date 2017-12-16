@@ -23,12 +23,13 @@ Vulkan_Engine::Vulkan_Engine(const char* app_name)
 
 	init_device_queue();
 
-
+	init_swapchain();
 }
 
 
 Vulkan_Engine::~Vulkan_Engine()
 {
+	destroy_swapchain();
 	destroy_command_buffer();
 	destroy_command_pool();
 	destroy_device();
@@ -232,7 +233,7 @@ void Vulkan_Engine::destroy_window()
 }
 #endif
 
-/*************************************************************Swapchain Part*******************************************************************************************/
+/*************************************************************Swapchain Extension Part*******************************************************************************************/
 void Vulkan_Engine::init_swapchain_extension()
 {
 	VkResult res;
@@ -387,4 +388,172 @@ void Vulkan_Engine::init_device_queue() {
 	{
 		vkGetDeviceQueue(m_device, m_present_queue_family_index, 0, &m_present_queue);
 	}
+}
+
+/*************************************************************Swapchain Part*******************************************************************************************/
+void Vulkan_Engine::init_swapchain(VkImageUsageFlags usageFlags) {
+	/* DEPENDS on m_cmd and m_queues initialized */
+
+	VkResult res;
+	VkSurfaceCapabilitiesKHR surfCapabilities;
+
+	res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_gpus[0], m_surface, &surfCapabilities);
+	assert(res == VK_SUCCESS);
+
+	uint32_t presentModeCount;
+	res = vkGetPhysicalDeviceSurfacePresentModesKHR(m_gpus[0], m_surface, &presentModeCount, NULL);
+	assert(res == VK_SUCCESS);
+	VkPresentModeKHR *presentModes = (VkPresentModeKHR *)malloc(presentModeCount * sizeof(VkPresentModeKHR));
+	assert(presentModes);
+	res = vkGetPhysicalDeviceSurfacePresentModesKHR(m_gpus[0], m_surface, &presentModeCount, presentModes);
+	assert(res == VK_SUCCESS);
+
+	VkExtent2D swapchainExtent;
+	// width and height are either both 0xFFFFFFFF, or both not 0xFFFFFFFF.
+	if (surfCapabilities.currentExtent.width == 0xFFFFFFFF) {
+		// If the surface size is undefined, the size is set to
+		// the size of the images requested.
+		swapchainExtent.width = m_width;
+		swapchainExtent.height = m_height;
+		if (swapchainExtent.width < surfCapabilities.minImageExtent.width) {
+			swapchainExtent.width = surfCapabilities.minImageExtent.width;
+		}
+		else if (swapchainExtent.width > surfCapabilities.maxImageExtent.width) {
+			swapchainExtent.width = surfCapabilities.maxImageExtent.width;
+		}
+
+		if (swapchainExtent.height < surfCapabilities.minImageExtent.height) {
+			swapchainExtent.height = surfCapabilities.minImageExtent.height;
+		}
+		else if (swapchainExtent.height > surfCapabilities.maxImageExtent.height) {
+			swapchainExtent.height = surfCapabilities.maxImageExtent.height;
+		}
+	}
+	else {
+		// If the surface size is defined, the swap chain size must match
+		swapchainExtent = surfCapabilities.currentExtent;
+	}
+
+	// The FIFO present mode is guaranteed by the spec to be supported
+	// Also note that current Android driver only supports FIFO
+	VkPresentModeKHR swapchainPresentMode = presentModes[0];
+
+	// Determine the number of VkImage's to use in the swap chain.
+	// We need to acquire only 1 presentable image at at time.
+	// Asking for minImageCount images ensures that we can acquire
+	// 1 presentable image as long as we present it before attempting
+	// to acquire another.
+	uint32_t desiredNumberOfSwapChainImages = surfCapabilities.minImageCount;
+
+	VkSurfaceTransformFlagBitsKHR preTransform;
+	if (surfCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) 
+	{
+		preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	}
+	else {
+		preTransform = surfCapabilities.currentTransform;
+	}
+
+	// Find a supported composite alpha mode - one of these is guaranteed to be set
+	VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	VkCompositeAlphaFlagBitsKHR compositeAlphaFlags[4] = {
+		VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+		VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+		VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
+		VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+	};
+	for (uint32_t i = 0; i < sizeof(compositeAlphaFlags); i++) {
+		if (surfCapabilities.supportedCompositeAlpha & compositeAlphaFlags[i]) {
+			compositeAlpha = compositeAlphaFlags[i];
+			break;
+		}
+	}
+
+	VkSwapchainCreateInfoKHR swapchain_ci = {};
+	swapchain_ci.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchain_ci.pNext = NULL;
+	swapchain_ci.surface = m_surface;
+	swapchain_ci.minImageCount = desiredNumberOfSwapChainImages;
+	swapchain_ci.imageFormat = m_format;
+	swapchain_ci.imageExtent.width = swapchainExtent.width;
+	swapchain_ci.imageExtent.height = swapchainExtent.height;
+	swapchain_ci.preTransform = preTransform;
+	swapchain_ci.compositeAlpha = compositeAlpha;
+	swapchain_ci.imageArrayLayers = 1;
+	swapchain_ci.presentMode = swapchainPresentMode;
+	swapchain_ci.oldSwapchain = VK_NULL_HANDLE;
+#if defined(_WIN32)
+	swapchain_ci.clipped = true;
+#endif
+	swapchain_ci.imageColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+	swapchain_ci.imageUsage = usageFlags;
+	swapchain_ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	swapchain_ci.queueFamilyIndexCount = 0;
+	swapchain_ci.pQueueFamilyIndices = NULL;
+
+	uint32_t queueFamilyIndices[2] = { (uint32_t)m_graphics_queue_family_index, (uint32_t)m_present_queue_family_index };
+	if (m_graphics_queue_family_index != m_present_queue_family_index) {
+		// If the graphics and present queues are from different queue families,
+		// we either have to explicitly transfer ownership of images between the
+		// queues, or we have to create the swapchain with imageSharingMode
+		// as VK_SHARING_MODE_CONCURRENT
+		swapchain_ci.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		swapchain_ci.queueFamilyIndexCount = 2;
+		swapchain_ci.pQueueFamilyIndices = queueFamilyIndices;
+	}
+
+	res = vkCreateSwapchainKHR(m_device, &swapchain_ci, NULL, &m_swapchain);
+	assert(res == VK_SUCCESS);
+
+	res = vkGetSwapchainImagesKHR(m_device, m_swapchain, &m_swapchainImageCount, NULL);
+	assert(res == VK_SUCCESS);
+
+	VkImage *swapchainImages = (VkImage *)malloc(m_swapchainImageCount * sizeof(VkImage));
+	assert(swapchainImages);
+	res = vkGetSwapchainImagesKHR(m_device, m_swapchain, &m_swapchainImageCount, swapchainImages);
+	assert(res == VK_SUCCESS);
+
+	for (uint32_t i = 0; i < m_swapchainImageCount; i++) 
+	{
+		swapchain_buffer sc_buffer;
+
+		VkImageViewCreateInfo color_image_view = {};
+		color_image_view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		color_image_view.pNext = NULL;
+		color_image_view.format = m_format;
+		color_image_view.components.r = VK_COMPONENT_SWIZZLE_R;
+		color_image_view.components.g = VK_COMPONENT_SWIZZLE_G;
+		color_image_view.components.b = VK_COMPONENT_SWIZZLE_B;
+		color_image_view.components.a = VK_COMPONENT_SWIZZLE_A;
+		color_image_view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		color_image_view.subresourceRange.baseMipLevel = 0;
+		color_image_view.subresourceRange.levelCount = 1;
+		color_image_view.subresourceRange.baseArrayLayer = 0;
+		color_image_view.subresourceRange.layerCount = 1;
+		color_image_view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		color_image_view.flags = 0;
+
+		sc_buffer.image = swapchainImages[i];
+
+		color_image_view.image = sc_buffer.image;
+
+		res = vkCreateImageView(m_device, &color_image_view, NULL, &sc_buffer.view);
+		m_buffers.push_back(sc_buffer);
+		assert(res == VK_SUCCESS);
+	}
+	free(swapchainImages);
+	m_current_buffer = 0;
+
+	/*if (NULL != presentModes) 
+	{
+		free(presentModes);
+	}*/
+}
+
+void Vulkan_Engine::destroy_swapchain()
+{
+	for (uint32_t i = 0; i < m_swapchainImageCount; i++) {
+		vkDestroyImageView(m_device, m_buffers[i].view, NULL);
+	}
+	vkDestroySwapchainKHR(m_device, m_swapchain, NULL);
 }
