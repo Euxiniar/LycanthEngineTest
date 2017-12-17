@@ -739,7 +739,6 @@ void Vulkan_Engine::init_uniform_buffer()
 
 	m_MVP = m_Clip * m_Projection * m_View * m_Model;
 
-	/* VULKAN_KEY_START */
 	VkBufferCreateInfo buf_info = {};
 	buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	buf_info.pNext = NULL;
