@@ -4,7 +4,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 set(NAME LycanthEngine)
 set(LIBS_PATH "${CMAKE_SOURCE_DIR}/libs")
-set(INCLUDES_PATH "${CMAKE_SOURCE_DIR}/includes")
+set(DEPS_PATH "${CMAKE_SOURCE_DIR}/deps")
 
 project(${NAME})
 
@@ -19,8 +19,8 @@ if(WIN32)
 
 	if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -W4")
-		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4267")
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4201")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4201")
 	
 	elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wextra -Wall -Wundef -Wno-unused-parameter -Wno-missing-field-initializers")
@@ -47,8 +47,9 @@ else()
 	message("Libs not linked !")
 endif()
 
-if(EXISTS ${INCLUDES_PATH})
-	include_directories("${INCLUDES_PATH}")
+if(EXISTS ${DEPS_PATH}/vulkan AND EXISTS ${DEPS_PATH}/glm)
+	include_directories("${DEPS_PATH}/vulkan")
+	include_directories("${DEPS_PATH}/glm")
 	message("Includes included")
 else()
 	message("Includes not included !")

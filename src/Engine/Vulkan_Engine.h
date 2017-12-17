@@ -4,8 +4,10 @@
 #include <cassert>
 #include <memory>
 #include <iostream>
+#include <glm\matrix.hpp>
+#include <glm\gtc\matrix_transform.hpp>
 
-typedef struct _swap_chain_buffers 
+typedef struct _swapchain_buffers 
 {
 	VkImage image;
 	VkImageView view;
@@ -48,6 +50,13 @@ private:
 	void init_swapchain(VkImageUsageFlags usageFlags = 17);
 	void destroy_swapchain();
 
+	void init_depth_buffer();
+	bool memory_type_from_properties(uint32_t typeBits, VkFlags requirements_mask, uint32_t * typeIndex);
+	void destroy_depth_buffer();
+
+	void init_uniform_buffer();
+	void destroy_uniform_buffer();
+
 
 
 	/*****************************************Arguments***************************************************************/
@@ -77,7 +86,7 @@ private:
 #endif
 
 	VkSurfaceKHR m_surface;
-	VkFormat m_format;
+	VkFormat m_format = VK_FORMAT_UNDEFINED;
 
 	VkCommandPool m_cmd_pool;
 	VkCommandBuffer m_cmd;
@@ -90,4 +99,24 @@ private:
 
 	std::vector<swapchain_buffer> m_buffers;
 	uint32_t m_current_buffer;
+
+	struct {
+		VkFormat format = VK_FORMAT_UNDEFINED;
+
+		VkImage image;
+		VkDeviceMemory mem;
+		VkImageView view;
+	} m_depth;
+
+	glm::mat4 m_Projection;
+	glm::mat4 m_View;
+	glm::mat4 m_Model;
+	glm::mat4 m_Clip;
+	glm::mat4 m_MVP;
+
+	struct {
+		VkBuffer buf;
+		VkDeviceMemory mem;
+		VkDescriptorBufferInfo buffer_info;
+	} m_uniform_data;
 };

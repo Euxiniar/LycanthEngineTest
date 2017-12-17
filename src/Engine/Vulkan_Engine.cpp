@@ -24,11 +24,17 @@ Vulkan_Engine::Vulkan_Engine(const char* app_name)
 	init_device_queue();
 
 	init_swapchain();
+
+	init_depth_buffer();
+
+	init_uniform_buffer();
 }
 
 
 Vulkan_Engine::~Vulkan_Engine()
 {
+	destroy_uniform_buffer();
+	destroy_depth_buffer();
 	destroy_swapchain();
 	destroy_command_buffer();
 	destroy_command_pool();
@@ -66,7 +72,7 @@ VkResult Vulkan_Engine::init_instance(char const *const app_short_name)
 	inst_info.pApplicationInfo = &app_info;
 	inst_info.enabledLayerCount = 0;// instance_layer_names.size();
 	inst_info.ppEnabledLayerNames = NULL;// instance_layer_names.size() ? instance_layer_names.data() : NULL;
-	inst_info.enabledExtensionCount = m_instance_extension_names.size();
+	inst_info.enabledExtensionCount = (uint32_t)m_instance_extension_names.size();
 	inst_info.ppEnabledExtensionNames = m_instance_extension_names.data();
 
 	VkResult res = vkCreateInstance(&inst_info, NULL, &m_inst);
@@ -129,7 +135,7 @@ VkResult Vulkan_Engine::init_device()
 	device_info.pNext = NULL;
 	device_info.queueCreateInfoCount = 1;
 	device_info.pQueueCreateInfos = &queue_info;
-	device_info.enabledExtensionCount = m_device_extension_names.size();
+	device_info.enabledExtensionCount = (uint32_t)m_device_extension_names.size();
 	device_info.ppEnabledExtensionNames = device_info.enabledExtensionCount ? m_device_extension_names.data() : NULL;
 	device_info.pEnabledFeatures = NULL;
 
@@ -281,7 +287,7 @@ void Vulkan_Engine::init_swapchain_extension()
 		// find a separate present queue.
 		for (size_t i = 0; i < m_queue_family_count; ++i)
 			if (pSupportsPresent[i] == VK_TRUE) {
-				m_present_queue_family_index = i;
+				m_present_queue_family_index = (uint32_t)i;
 				break;
 			}
 	}
@@ -434,10 +440,26 @@ void Vulkan_Engine::init_swapchain(VkImageUsageFlags usageFlags) {
 		swapchainExtent = surfCapabilities.currentExtent;
 	}
 
-	// The FIFO present mode is guaranteed by the spec to be supported
-	// Also note that current Android driver only supports FIFO
-	VkPresentModeKHR swapchainPresentMode = presentModes[0];
-
+	VkPresentModeKHR swapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+	for (int i = 0; i <= (sizeof(presentModes) / sizeof(VkPresentModeKHR)); i++)
+	{
+		// The FIFO present mode is guaranteed by the spec to be supported
+		// Also note that current Android driver only supports FIFO
+		if (presentModes[i] & VK_PRESENT_MODE_FIFO_KHR)
+		{
+			swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+			break;
+		}
+	}
+	if (!(swapchainPresentMode & VK_PRESENT_MODE_FIFO_KHR))
+	{
+#if defined(_WIN32)
+		MessageBox(m_window, "FIFO mode not supported !", "Error", MB_ICONERROR | IDCANCEL);
+#else
+		std::wcout << "FIFO mode not supported !";
+#endif
+		exit(-1);
+	}
 	// Determine the number of VkImage's to use in the swap chain.
 	// We need to acquire only 1 presentable image at at time.
 	// Asking for minImageCount images ensures that we can acquire
@@ -556,4 +578,215 @@ void Vulkan_Engine::destroy_swapchain()
 		vkDestroyImageView(m_device, m_buffers[i].view, NULL);
 	}
 	vkDestroySwapchainKHR(m_device, m_swapchain, NULL);
+}
+
+/**********************************************************Depth Buffer Part*****************************************************************************************/
+void Vulkan_Engine::init_depth_buffer() 
+{
+	VkResult res;
+	bool pass;
+	VkImageCreateInfo image_info = {};
+
+	/* allow custom depth formats */
+#if defined(_WIN32)
+	if (m_depth.format == VK_FORMAT_UNDEFINED)
+	{
+		m_depth.format = VK_FORMAT_D16_UNORM;
+	}
+#endif
+
+	const VkFormat depth_format = m_depth.format;
+	VkFormatProperties props;
+	vkGetPhysicalDeviceFormatProperties(m_gpus[0], depth_format, &props);
+	if (props.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) 
+	{
+		image_info.tiling = VK_IMAGE_TILING_LINEAR;
+	}
+	else if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) 
+	{
+		image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	}
+	else 
+	{
+		/* Try other depth formats? */
+		std::cout << "depth_format " << depth_format << " Unsupported.\n";
+		exit(-1);
+	}
+
+	image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	image_info.pNext = NULL;
+	image_info.imageType = VK_IMAGE_TYPE_2D;
+	image_info.format = depth_format;
+	image_info.extent.width = m_width;
+	image_info.extent.height = m_height;
+	image_info.extent.depth = 1;
+	image_info.mipLevels = 1;
+	image_info.arrayLayers = 1;
+	image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+	image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	image_info.queueFamilyIndexCount = 0;
+	image_info.pQueueFamilyIndices = NULL;
+	image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	image_info.flags = 0;
+
+	VkMemoryAllocateInfo mem_alloc = {};
+	mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mem_alloc.pNext = NULL;
+	mem_alloc.allocationSize = 0;
+	mem_alloc.memoryTypeIndex = 0;
+
+	VkImageViewCreateInfo view_info = {};
+	view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	view_info.pNext = NULL;
+	view_info.image = VK_NULL_HANDLE;
+	view_info.format = depth_format;
+	view_info.components.r = VK_COMPONENT_SWIZZLE_R;
+	view_info.components.g = VK_COMPONENT_SWIZZLE_G;
+	view_info.components.b = VK_COMPONENT_SWIZZLE_B;
+	view_info.components.a = VK_COMPONENT_SWIZZLE_A;
+	view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	view_info.subresourceRange.baseMipLevel = 0;
+	view_info.subresourceRange.levelCount = 1;
+	view_info.subresourceRange.baseArrayLayer = 0;
+	view_info.subresourceRange.layerCount = 1;
+	view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	view_info.flags = 0;
+
+	if (depth_format == VK_FORMAT_D16_UNORM_S8_UINT || depth_format == VK_FORMAT_D24_UNORM_S8_UINT ||
+		depth_format == VK_FORMAT_D32_SFLOAT_S8_UINT) 
+	{
+		view_info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+	}
+
+	VkMemoryRequirements mem_reqs;
+
+	/* Create image */
+	res = vkCreateImage(m_device, &image_info, NULL, &m_depth.image);
+	assert(res == VK_SUCCESS);
+
+	vkGetImageMemoryRequirements(m_device, m_depth.image, &mem_reqs);
+
+	mem_alloc.allocationSize = mem_reqs.size;
+	/* Use the memory properties to determine the type of memory required */
+	pass =
+		memory_type_from_properties(mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &mem_alloc.memoryTypeIndex);
+	assert(pass);
+
+	/* Allocate memory */
+	res = vkAllocateMemory(m_device, &mem_alloc, NULL, &m_depth.mem);
+	assert(res == VK_SUCCESS);
+
+	/* Bind memory */
+	res = vkBindImageMemory(m_device, m_depth.image, m_depth.mem, 0);
+	assert(res == VK_SUCCESS);
+
+	/* Create image view */
+	view_info.image = m_depth.image;
+	res = vkCreateImageView(m_device, &view_info, NULL, &m_depth.view);
+	assert(res == VK_SUCCESS);
+}
+
+bool Vulkan_Engine::memory_type_from_properties(uint32_t typeBits, VkFlags requirements_mask, uint32_t *typeIndex) 
+{
+	// Search memtypes to find first index with those properties
+	for (uint32_t i = 0; i < m_memory_props.memoryTypeCount; i++) 
+	{
+		if ((typeBits & 1) == 1) 
+		{
+			// Type is available, does it match user properties?
+			if ((m_memory_props.memoryTypes[i].propertyFlags & requirements_mask) == requirements_mask) 
+			{
+				*typeIndex = i;
+				return true;
+			}
+		}
+		typeBits >>= 1;
+	}
+	// No memory types matched, return failure
+	return false;
+}
+
+void Vulkan_Engine::destroy_depth_buffer() 
+{
+	vkDestroyImageView(m_device, m_depth.view, NULL);
+	vkDestroyImage(m_device, m_depth.image, NULL);
+	vkFreeMemory(m_device, m_depth.mem, NULL);
+}
+
+/**********************************************************Uniform Buffer Part*****************************************************************************************/
+void Vulkan_Engine::init_uniform_buffer()
+{
+	VkResult res;
+	bool pass;
+	float fov = glm::radians(45.0f);
+	if (m_width > m_height) {
+		fov *= static_cast<float>(m_height) / static_cast<float>(m_width);
+	}
+	m_Projection = glm::perspective(fov, static_cast<float>(m_width) / static_cast<float>(m_height), 0.1f, 100.0f);
+	m_View = glm::lookAt(
+		glm::vec3(-2, 0, 0),  // Camera position in the space
+		glm::vec3(0, 0,	0),     // camera looking at
+		glm::vec3(0, 0, 0)     // camera tilt
+	);
+	m_Model = glm::mat4(1.0f);
+	// Vulkan clip space has inverted Y and half Z.
+	m_Clip = glm::mat4(
+		1.0f, 0.0f, 0.0f, 0.0f, 
+		0.0f, -1.0f, 0.0f, 0.0f, 
+		0.0f, 0.0f, 0.5f, 0.0f, 
+		0.0f, 0.0f, 0.5f, 1.0f);
+
+	m_MVP = m_Clip * m_Projection * m_View * m_Model;
+
+	/* VULKAN_KEY_START */
+	VkBufferCreateInfo buf_info = {};
+	buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buf_info.pNext = NULL;
+	buf_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	buf_info.size = sizeof(m_MVP);
+	buf_info.queueFamilyIndexCount = 0;
+	buf_info.pQueueFamilyIndices = NULL;
+	buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	buf_info.flags = 0;
+	res = vkCreateBuffer(m_device, &buf_info, NULL, &m_uniform_data.buf);
+	assert(res == VK_SUCCESS);
+
+	VkMemoryRequirements mem_reqs;
+	vkGetBufferMemoryRequirements(m_device, m_uniform_data.buf, &mem_reqs);
+
+	VkMemoryAllocateInfo alloc_info = {};
+	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	alloc_info.pNext = NULL;
+	alloc_info.memoryTypeIndex = 0;
+
+	alloc_info.allocationSize = mem_reqs.size;
+	pass = memory_type_from_properties(mem_reqs.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&alloc_info.memoryTypeIndex);
+	assert(pass && "No mappable, coherent memory");
+
+	res = vkAllocateMemory(m_device, &alloc_info, NULL, &(m_uniform_data.mem));
+	assert(res == VK_SUCCESS);
+
+	uint8_t *pData;
+	res = vkMapMemory(m_device, m_uniform_data.mem, 0, mem_reqs.size, 0, (void **)&pData);
+	assert(res == VK_SUCCESS);
+
+	memcpy(pData, &m_MVP, sizeof(m_MVP));
+
+	vkUnmapMemory(m_device, m_uniform_data.mem);
+
+	res = vkBindBufferMemory(m_device, m_uniform_data.buf, m_uniform_data.mem, 0);
+	assert(res == VK_SUCCESS);
+
+	m_uniform_data.buffer_info.buffer = m_uniform_data.buf;
+	m_uniform_data.buffer_info.offset = 0;
+	m_uniform_data.buffer_info.range = sizeof(m_MVP);
+}
+
+void Vulkan_Engine::destroy_uniform_buffer()
+{
+	vkDestroyBuffer(m_device, m_uniform_data.buf, NULL);
+	vkFreeMemory(m_device, m_uniform_data.mem, NULL);
 }
