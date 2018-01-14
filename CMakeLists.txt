@@ -33,6 +33,7 @@ file(GLOB_RECURSE SRC
 )
 	 
 include_directories("${DEPS_PATH}/vulkan")
+include_directories("${DEPS_PATH}/glm")
 link_directories(${LIBS_PATH})
 
 
@@ -48,6 +49,7 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(${DEPS_PATH}/glfw)
+
 target_link_libraries(${PROJECT_NAME} glfw)
 target_link_libraries(${PROJECT_NAME} vulkan-1)
 
