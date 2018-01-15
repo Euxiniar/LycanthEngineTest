@@ -53,3 +53,6 @@ add_subdirectory(${DEPS_PATH}/glfw)
 target_link_libraries(${PROJECT_NAME} glfw)
 target_link_libraries(${PROJECT_NAME} vulkan-1)
 
+file(COPY "shaders" DESTINATION "./")
+file(COPY "shaders" DESTINATION "./Debug")
+file(COPY "shaders" DESTINATION "./Release")
