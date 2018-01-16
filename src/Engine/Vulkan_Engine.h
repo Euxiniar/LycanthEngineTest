@@ -1,7 +1,12 @@
 #pragma once
-#include <vector>
 #include <vulkan\vulkan.h>
 #include <GLFW\glfw3.h>
+
+#include <iostream>
+#include <set>
+#include <vector>
+#include <algorithm>
+#include <fstream>
 
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
@@ -11,6 +16,9 @@ const bool enableValidationLayers = true;
 
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_LUNARG_standard_validation"
+};
+const std::vector<const char*> deviceExtensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 VkResult CreateDebugReportCallbackEXT(VkInstance instance, 
@@ -65,6 +73,8 @@ public:
 	void initVulkan();
 	
 private:
+	GLFWwindow * window;
+
 	VkInstance instance;
 	VkDebugReportCallbackEXT callback;
 	VkSurfaceKHR surface;
@@ -95,4 +105,25 @@ private:
 	void createInstance();
 	bool checkValidationLayerSupport();
 	std::vector<const char*> getRequiredExtensions();
+
+	void setupDebugCallback();
+	void createSurface();
+	void pickPhysicalDevice();
+	bool isDeviceSuitable(VkPhysicalDevice device);
+	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+	void createLogicalDevice();
+	void createSwapChain();
+	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
+	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR & capabilities);
+	void createImageViews();
+	void createRenderPass();
+	void createGraphicsPipeline();
+	VkShaderModule createShaderModule(const std::vector<char>& code);
+	void createFramebuffers();
+	void createCommandPool();
+	void createCommandBuffers();
+	void createSemaphores();
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 };
