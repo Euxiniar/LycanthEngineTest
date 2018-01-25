@@ -1,5 +1,6 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include "Engine\Vulkan_Engine.h"
 
 #include <iostream>
 #include <fstream>
@@ -12,65 +13,65 @@
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
-const std::vector<const char*> validationLayers = {
-	"VK_LAYER_LUNARG_standard_validation"
-};
+//const std::vector<const char*> validationLayers = {
+//	"VK_LAYER_LUNARG_standard_validation"
+//};
 
-const std::vector<const char*> deviceExtensions = {
-	VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
+//const std::vector<const char*> deviceExtensions = {
+//	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+//};
 
-#ifdef NDEBUG
-const bool enableValidationLayers = false;
-#else
-const bool enableValidationLayers = false;
-#endif
+//#ifdef NDEBUG
+//const bool enableValidationLayers = false;
+//#else
+//const bool enableValidationLayers = false;
+//#endif
 
-VkResult CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback) {
-	auto func = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-	if (func != nullptr) {
-		return func(instance, pCreateInfo, pAllocator, pCallback);
-	}
-	else {
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-	}
-}
+//VkResult CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback) {
+//	auto func = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+//	if (func != nullptr) {
+//		return func(instance, pCreateInfo, pAllocator, pCallback);
+//	}
+//	else {
+//		return VK_ERROR_EXTENSION_NOT_PRESENT;
+//	}
+//}
 
-void DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator) {
+void destroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator) {
 	auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
 	if (func != nullptr) {
 		func(instance, callback, pAllocator);
 	}
 }
 
-struct QueueFamilyIndices {
-	int graphicsFamily = -1;
-	int presentFamily = -1;
+//struct QueueFamilyIndices {
+//	int graphicsFamily = -1;
+//	int presentFamily = -1;
+//
+//	bool isComplete() {
+//		return graphicsFamily >= 0 && presentFamily >= 0;
+//	}
+//};
 
-	bool isComplete() {
-		return graphicsFamily >= 0 && presentFamily >= 0;
-	}
-};
-
-struct SwapChainSupportDetails {
-	VkSurfaceCapabilitiesKHR capabilities;
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> presentModes;
-};
+//struct SwapChainSupportDetails {
+//	VkSurfaceCapabilitiesKHR capabilities;
+//	std::vector<VkSurfaceFormatKHR> formats;
+//	std::vector<VkPresentModeKHR> presentModes;
+//};
 
 class HelloTriangleApplication {
 public:
 	void run() {
 		initWindow();
-		initVulkan();
+		vulkan_kernel.initVulkan(*window);
 		mainLoop();
-		cleanup();
+		vulkan_kernel.cleanup(*window);
 	}
 
 private:
 	GLFWwindow * window;
-
-	VkInstance instance;
+	Vulkan_Kernel vulkan_kernel;
+	/*VkInstance instance;
 	VkDebugReportCallbackEXT callback;
 	VkSurfaceKHR surface;
 
@@ -95,7 +96,7 @@ private:
 	std::vector<VkCommandBuffer> commandBuffers;
 
 	VkSemaphore imageAvailableSemaphore;
-	VkSemaphore renderFinishedSemaphore;
+	VkSemaphore renderFinishedSemaphore;*/
 
 	void initWindow() {
 		glfwInit();
@@ -108,7 +109,7 @@ private:
 		glfwSetWindowSizeCallback(window, HelloTriangleApplication::onWindowResized);
 	}
 
-	void initVulkan() {
+	/*void initVulkan() {
 		createInstance();
 		setupDebugCallback();
 		createSurface();
@@ -122,18 +123,18 @@ private:
 		createCommandPool();
 		createCommandBuffers();
 		createSemaphores();
-	}
+	}*/
 
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
-			drawFrame();
+			vulkan_kernel.drawFrame(*window);
 		}
 
-		vkDeviceWaitIdle(device);
+		vulkan_kernel.deviceWaitIdle();
 	}
 
-	void cleanupSwapChain() {
+	/*void cleanupSwapChain() {
 		for (auto framebuffer : swapChainFramebuffers) {
 			vkDestroyFramebuffer(device, framebuffer, nullptr);
 		}
@@ -149,9 +150,9 @@ private:
 		}
 
 		vkDestroySwapchainKHR(device, swapChain, nullptr);
-	}
+	}*/
 
-	void cleanup() {
+	/*void cleanup() {
 		cleanupSwapChain();
 
 		vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
@@ -167,29 +168,29 @@ private:
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
-	}
+	}*/
 
 	static void onWindowResized(GLFWwindow* window, int width, int height) {
 		if (width == 0 || height == 0) return;
 
 		HelloTriangleApplication* app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
-		app->recreateSwapChain();
+		app->vulkan_kernel.recreateSwapChain(*app->window);
 	}
 
-	void recreateSwapChain() {
-		vkDeviceWaitIdle(device);
+	//void recreateSwapChain() {
+	//	vkDeviceWaitIdle(device);
 
-		cleanupSwapChain();
+	//	cleanupSwapChain();
 
-		createSwapChain();
-		createImageViews();
-		createRenderPass();
-		createGraphicsPipeline();
-		createFramebuffers();
-		createCommandBuffers();
-	}
+	//	createSwapChain();
+	//	createImageViews();
+	//	createRenderPass();
+	//	createGraphicsPipeline();
+	//	createFramebuffers();
+	//	createCommandBuffers();
+	//}
 
-	void createInstance() {
+	/*void createInstance() {
 		if (enableValidationLayers && !checkValidationLayerSupport()) {
 			throw std::runtime_error("validation layers requested, but not available!");
 		}
@@ -221,9 +222,9 @@ private:
 		if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create instance!");
 		}
-	}
+	}*/
 
-	void setupDebugCallback() {
+	/*void setupDebugCallback() {
 		if (!enableValidationLayers) return;
 
 		VkDebugReportCallbackCreateInfoEXT createInfo = {};
@@ -234,15 +235,15 @@ private:
 		if (CreateDebugReportCallbackEXT(instance, &createInfo, nullptr, &callback) != VK_SUCCESS) {
 			throw std::runtime_error("failed to set up debug callback!");
 		}
-	}
+	}*/
 
-	void createSurface() {
+	/*void createSurface() {
 		if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create window surface!");
 		}
-	}
+	}*/
 
-	void pickPhysicalDevice() {
+	/*void pickPhysicalDevice() {
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
@@ -263,9 +264,9 @@ private:
 		if (physicalDevice == VK_NULL_HANDLE) {
 			throw std::runtime_error("failed to find a suitable GPU!");
 		}
-	}
+	}*/
 
-	void createLogicalDevice() {
+	/*void createLogicalDevice() {
 		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -308,9 +309,9 @@ private:
 
 		vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
 		vkGetDeviceQueue(device, indices.presentFamily, 0, &presentQueue);
-	}
+	}*/
 
-	void createSwapChain() {
+	/*void createSwapChain() {
 		SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
 
 		VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
@@ -360,9 +361,9 @@ private:
 
 		swapChainImageFormat = surfaceFormat.format;
 		swapChainExtent = extent;
-	}
+	}*/
 
-	void createImageViews() {
+	/*void createImageViews() {
 		swapChainImageViews.resize(swapChainImages.size());
 
 		for (size_t i = 0; i < swapChainImages.size(); i++) {
@@ -385,9 +386,9 @@ private:
 				throw std::runtime_error("failed to create image views!");
 			}
 		}
-	}
+	}*/
 
-	void createRenderPass() {
+	/*void createRenderPass() {
 		VkAttachmentDescription colorAttachment = {};
 		colorAttachment.format = swapChainImageFormat;
 		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -539,9 +540,9 @@ private:
 
 		vkDestroyShaderModule(device, fragShaderModule, nullptr);
 		vkDestroyShaderModule(device, vertShaderModule, nullptr);
-	}
+	}*/
 
-	void createFramebuffers() {
+	/*void createFramebuffers() {
 		swapChainFramebuffers.resize(swapChainImageViews.size());
 
 		for (size_t i = 0; i < swapChainImageViews.size(); i++) {
@@ -574,9 +575,9 @@ private:
 		if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create command pool!");
 		}
-	}
+	}*/
 
-	void createCommandBuffers() {
+	/*void createCommandBuffers() {
 		commandBuffers.resize(swapChainFramebuffers.size());
 
 		VkCommandBufferAllocateInfo allocInfo = {};
@@ -620,9 +621,9 @@ private:
 				throw std::runtime_error("failed to record command buffer!");
 			}
 		}
-	}
+	}*/
 
-	void createSemaphores() {
+	/*void createSemaphores() {
 		VkSemaphoreCreateInfo semaphoreInfo = {};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -631,9 +632,9 @@ private:
 
 			throw std::runtime_error("failed to create semaphores!");
 		}
-	}
+	}*/
 
-	void drawFrame() {
+	/*void drawFrame() {
 		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
@@ -687,9 +688,9 @@ private:
 		}
 
 		vkQueueWaitIdle(presentQueue);
-	}
+	}*/
 
-	VkShaderModule createShaderModule(const std::vector<char>& code) {
+	/*VkShaderModule createShaderModule(const std::vector<char>& code) {
 		VkShaderModuleCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 		createInfo.codeSize = code.size();
@@ -701,9 +702,9 @@ private:
 		}
 
 		return shaderModule;
-	}
+	}*/
 
-	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+	/*VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
 		if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
 			return { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 		}
@@ -715,9 +716,9 @@ private:
 		}
 
 		return availableFormats[0];
-	}
+	}*/
 
-	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
+	/*VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes) {
 		VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
 
 		for (const auto& availablePresentMode : availablePresentModes) {
@@ -730,9 +731,9 @@ private:
 		}
 
 		return bestMode;
-	}
+	}*/
 
-	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+	/*VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
 		if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
 			return capabilities.currentExtent;
 		}
@@ -750,9 +751,9 @@ private:
 
 			return actualExtent;
 		}
-	}
+	}*/
 
-	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
+	/*SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
 		SwapChainSupportDetails details;
 
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
@@ -774,9 +775,9 @@ private:
 		}
 
 		return details;
-	}
+	}*/
 
-	bool isDeviceSuitable(VkPhysicalDevice device) {
+	/*bool isDeviceSuitable(VkPhysicalDevice device) {
 		QueueFamilyIndices indices = findQueueFamilies(device);
 
 		bool extensionsSupported = checkDeviceExtensionSupport(device);
@@ -788,9 +789,9 @@ private:
 		}
 
 		return indices.isComplete() && extensionsSupported && swapChainAdequate;
-	}
+	}*/
 
-	bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+	/*bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
 		uint32_t extensionCount;
 		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
@@ -804,9 +805,9 @@ private:
 		}
 
 		return requiredExtensions.empty();
-	}
+	}*/
 
-	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+	/*QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
 		QueueFamilyIndices indices;
 
 		uint32_t queueFamilyCount = 0;
@@ -836,9 +837,9 @@ private:
 		}
 
 		return indices;
-	}
+	}*/
 
-	std::vector<const char*> getRequiredExtensions() {
+	/*std::vector<const char*> getRequiredExtensions() {
 		std::vector<const char*> extensions;
 
 		uint32_t glfwExtensionCount = 0;
@@ -854,9 +855,9 @@ private:
 		}
 
 		return extensions;
-	}
+	}*/
 
-	bool checkValidationLayerSupport() {
+	/*bool checkValidationLayerSupport() {
 		uint32_t layerCount;
 		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
@@ -879,9 +880,9 @@ private:
 		}
 
 		return true;
-	}
+	}*/
 
-	static std::vector<char> readFile(const std::string& filename) {
+	/*static std::vector<char> readFile(const std::string& filename) {
 		std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
 		if (!file.is_open()) {
@@ -903,7 +904,7 @@ private:
 		std::cerr << "validation layer: " << msg << std::endl;
 
 		return VK_FALSE;
-	}
+	}*/
 };
 
 int main() {
