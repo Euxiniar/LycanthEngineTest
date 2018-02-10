@@ -44,6 +44,7 @@ void DestroyDebugReportCallbackEXT(VkInstance instance,
 	if (func != nullptr)
 	{
 		func(instance, callback, pAllocator);
+
 	}
 }
 
